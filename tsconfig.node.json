@@ -1,5 +1,8 @@
 {
   "compilerOptions": {
+    "paths": {
+      "@/*": ["./src/*"]
+    },
     "composite": true,
     "skipLibCheck": true,
     "module": "ESNext",

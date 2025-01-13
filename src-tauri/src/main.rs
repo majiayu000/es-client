@@ -47,6 +47,14 @@ async fn main() {
             commands::save_connection_info,
             commands::load_saved_connections,
             commands::delete_saved_connection,
+            commands::list_snapshot_repositories,
+            commands::list_snapshots,
+            commands::create_snapshot_repository,
+            commands::create_snapshot,
+            commands::delete_snapshot,
+            commands::restore_snapshot,
+            commands::get_cluster_health,
+            commands::get_cluster_stats,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");

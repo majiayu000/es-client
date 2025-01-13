@@ -1,14 +1,20 @@
 use crate::{
     config::ElasticsearchConfig,
-    elasticsearch::client::{ESClient, IndexInfo, ClusterInfo, ShardInfo, ConnectionInfo},
+    elasticsearch::client::{
+        ESClient, IndexInfo, ClusterInfo, ShardInfo, ConnectionInfo,
+        SnapshotRepository, Snapshot, ClusterHealth
+    },
     error::{AppError, AppResult},
     db::SavedConnection,
     AppState,
 };
+use serde_json::{Value, json};
+use serde::{Deserialize, Serialize};
+#[allow(unused_imports)]
+use serde as _;
 use tauri::State;
 use chrono::Utc;
 use url::Url;
-use serde_json::json;
 
 #[tauri::command(async)]
 pub async fn connect_elasticsearch(
@@ -193,4 +199,179 @@ pub async fn delete_saved_connection(
     state: State<'_, AppState>,
 ) -> AppResult<()> {
     state.db.delete_connection(id).await
+}
+
+#[tauri::command]
+pub async fn list_snapshot_repositories(
+    connection_id: String,
+    state: State<'_, AppState>,
+) -> Result<Vec<SnapshotRepository>, String> {
+    let es_clients = state.es_clients.lock().await;
+    let client = es_clients
+        .get(&connection_id)
+        .ok_or_else(|| "Not connected to Elasticsearch".to_string())?;
+    
+    client.list_snapshot_repositories()
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CreateRepositoryRequest {
+    pub connection_id: String,
+    pub name: String,
+    #[serde(rename = "type")]
+    pub repository_type: String,
+    pub settings: Value,
+}
+
+#[tauri::command]
+pub async fn create_snapshot_repository(
+    connection_id: String,
+    name: String,
+    r#type: String,
+    settings: Value,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    println!("=== Create Snapshot Repository Command Started ===");
+    println!("Command parameters received:");
+    println!("  connection_id: {:?}", connection_id);
+    println!("  name: {:?}", name);
+    println!("  type: {:?}", r#type);
+    println!("  settings: {:?}", settings);
+
+    let es_clients = state.es_clients.lock().await;
+    println!("ES clients lock acquired");
+    
+    println!("Looking for client with connection_id: {}", connection_id);
+    let client = match es_clients.get(&connection_id) {
+        Some(client) => {
+            println!("Found ES client for connection_id: {}", connection_id);
+            client
+        },
+        None => {
+            let error = format!("No client found for connection_id: {}", connection_id);
+            println!("Error: {}", error);
+            return Err(error);
+        }
+    };
+    
+    println!("Attempting to create snapshot repository");
+    println!("Parameters for create_snapshot_repository:");
+    println!("  Name: {}", name);
+    println!("  Type: {}", r#type);
+    println!("  Settings: {}", settings);
+
+    match client.create_snapshot_repository(&name, &r#type, settings).await {
+        Ok(_) => {
+            println!("Successfully created snapshot repository");
+            println!("=== Command completed successfully ===");
+            Ok(())
+        }
+        Err(e) => {
+            let error = format!("Failed to create snapshot repository: {}", e);
+            println!("Error: {}", error);
+            println!("=== Command failed ===");
+            Err(error)
+        }
+    }
+}
+
+#[tauri::command]
+pub async fn list_snapshots(
+    connection_id: String,
+    repository: String,
+    state: State<'_, AppState>,
+) -> Result<Vec<Snapshot>, String> {
+    let es_clients = state.es_clients.lock().await;
+    let client = es_clients
+        .get(&connection_id)
+        .ok_or_else(|| "Not connected to Elasticsearch".to_string())?;
+    
+    client.list_snapshots(&repository)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn create_snapshot(
+    connection_id: String,
+    repository: String,
+    snapshot: String,
+    indices: Option<Vec<String>>,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let es_clients = state.es_clients.lock().await;
+    let client = es_clients
+        .get(&connection_id)
+        .ok_or_else(|| "Not connected to Elasticsearch".to_string())?;
+    
+    client.create_snapshot(&repository, &snapshot, indices)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn delete_snapshot(
+    connection_id: String,
+    repository: String,
+    snapshot: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let es_clients = state.es_clients.lock().await;
+    let client = es_clients
+        .get(&connection_id)
+        .ok_or_else(|| "Not connected to Elasticsearch".to_string())?;
+    
+    client.delete_snapshot(&repository, &snapshot)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn restore_snapshot(
+    connection_id: String,
+    repository: String,
+    snapshot: String,
+    indices: Option<Vec<String>>,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let es_clients = state.es_clients.lock().await;
+    let client = es_clients
+        .get(&connection_id)
+        .ok_or_else(|| "Not connected to Elasticsearch".to_string())?;
+    
+    client.restore_snapshot(&repository, &snapshot, indices)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_cluster_health(
+    connection_id: String,
+    state: State<'_, AppState>,
+) -> Result<ClusterHealth, String> {
+    let es_clients = state.es_clients.lock().await;
+    let client = es_clients
+        .get(&connection_id)
+        .ok_or_else(|| "Not connected to Elasticsearch".to_string())?;
+    
+    client.get_cluster_health()
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_cluster_stats(
+    connection_id: String,
+    state: State<'_, AppState>,
+) -> Result<Value, String> {
+    let es_clients = state.es_clients.lock().await;
+    let client = es_clients
+        .get(&connection_id)
+        .ok_or_else(|| "Not connected to Elasticsearch".to_string())?;
+    
+    client.get_cluster_stats()
+        .await
+        .map_err(|e| e.to_string())
 } 

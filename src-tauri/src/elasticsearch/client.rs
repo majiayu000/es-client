@@ -2,10 +2,17 @@ use elasticsearch::{
     Elasticsearch,
     http::transport::Transport,
     cat::CatIndicesParts,
-    cluster::ClusterHealthParts,
+    cluster::{ClusterHealthParts, ClusterStatsParts},
     nodes::NodesInfoParts,
+    snapshot::{
+        SnapshotGetRepositoryParts, SnapshotGetParts,
+        SnapshotCreateRepositoryParts, SnapshotCreateParts,
+        SnapshotDeleteParts, SnapshotRestoreParts
+    },
     params::Bytes,
+    Error,
 };
+use serde_json::{Value, json};
 use crate::{
     config::ElasticsearchConfig,
     error::{AppError, AppResult},
@@ -63,6 +70,49 @@ pub struct ConnectionInfo {
     pub name: String,
     pub hosts: Vec<String>,
     pub is_active: bool,
+}
+
+#[derive(Debug, Serialize)]
+pub struct SnapshotRepository {
+    pub name: String,
+    pub type_: String,
+    pub settings: Value,
+}
+
+#[derive(Debug, Serialize)]
+pub struct Snapshot {
+    pub snapshot: String,
+    pub state: String,
+    pub start_time: String,
+    pub end_time: Option<String>,
+    pub duration_in_millis: Option<i64>,
+    pub indices: Vec<String>,
+    pub shards: SnapshotShards,
+}
+
+#[derive(Debug, Serialize)]
+pub struct SnapshotShards {
+    pub total: i32,
+    pub failed: i32,
+    pub successful: i32,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ClusterHealth {
+    pub cluster_name: String,
+    pub status: String,
+    pub number_of_nodes: i32,
+    pub number_of_data_nodes: i32,
+    pub active_primary_shards: i32,
+    pub active_shards: i32,
+    pub relocating_shards: i32,
+    pub initializing_shards: i32,
+    pub unassigned_shards: i32,
+    pub delayed_unassigned_shards: i32,
+    pub number_of_pending_tasks: i32,
+    pub number_of_in_flight_fetch: i32,
+    pub task_max_waiting_in_queue_millis: i64,
+    pub active_shards_percent_as_number: f64,
 }
 
 #[derive(Clone)]
@@ -288,5 +338,195 @@ impl ESClient {
             .collect();
 
         Ok(shard_infos)
+    }
+
+    pub async fn list_snapshot_repositories(&self) -> Result<Vec<SnapshotRepository>, Error> {
+        let response = self.client
+            .snapshot()
+            .get_repository(SnapshotGetRepositoryParts::None)
+            .send()
+            .await?;
+
+        let repositories = response.json::<Value>().await?;
+        let mut result = Vec::new();
+
+        if let Value::Object(repos) = repositories {
+            for (name, details) in repos {
+                if let Value::Object(repo_details) = details {
+                    let type_ = repo_details.get("type").and_then(|t| t.as_str()).unwrap_or("unknown").to_string();
+                    let settings = repo_details.get("settings").cloned().unwrap_or(Value::Null);
+                    result.push(SnapshotRepository {
+                        name,
+                        type_,
+                        settings,
+                    });
+                }
+            }
+        }
+
+        Ok(result)
+    }
+
+    pub async fn list_snapshots(&self, repository: &str) -> Result<Vec<Snapshot>, Error> {
+        let response = self.client
+            .snapshot()
+            .get(SnapshotGetParts::RepositorySnapshot(repository, &["_all"]))
+            .send()
+            .await?;
+
+        let snapshots = response.json::<Value>().await?;
+        let mut result = Vec::new();
+
+        if let Some(snapshots_array) = snapshots.get("snapshots").and_then(|s| s.as_array()) {
+            for snapshot in snapshots_array {
+                if let Some(obj) = snapshot.as_object() {
+                    let shards = obj.get("shards")
+                        .and_then(|s| s.as_object())
+                        .map(|s| s.to_owned())
+                        .unwrap_or_default();
+                    result.push(Snapshot {
+                        snapshot: obj.get("snapshot").and_then(|s| s.as_str()).unwrap_or("").to_string(),
+                        state: obj.get("state").and_then(|s| s.as_str()).unwrap_or("").to_string(),
+                        start_time: obj.get("start_time").and_then(|s| s.as_str()).unwrap_or("").to_string(),
+                        end_time: obj.get("end_time").and_then(|s| s.as_str()).map(|s| s.to_string()),
+                        duration_in_millis: obj.get("duration_in_millis").and_then(|d| d.as_i64()),
+                        indices: obj.get("indices").and_then(|i| i.as_array())
+                            .map(|arr| arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect())
+                            .unwrap_or_default(),
+                        shards: SnapshotShards {
+                            total: shards.get("total").and_then(|t| t.as_i64()).unwrap_or(0) as i32,
+                            failed: shards.get("failed").and_then(|f| f.as_i64()).unwrap_or(0) as i32,
+                            successful: shards.get("successful").and_then(|s| s.as_i64()).unwrap_or(0) as i32,
+                        },
+                    });
+                }
+            }
+        }
+
+        Ok(result)
+    }
+
+    pub async fn create_snapshot_repository(
+        &self,
+        name: &str,
+        type_: &str,
+        settings: Value,
+    ) -> Result<(), Error> {
+        let body = json!({
+            "type": type_,
+            "settings": settings
+        });
+
+        self.client
+            .snapshot()
+            .create_repository(SnapshotCreateRepositoryParts::Repository(name))
+            .body(body)
+            .send()
+            .await?;
+
+        Ok(())
+    }
+
+    pub async fn create_snapshot(
+        &self,
+        repository: &str,
+        snapshot: &str,
+        indices: Option<Vec<String>>,
+    ) -> Result<(), Error> {
+        let mut body = json!({
+            "ignore_unavailable": true,
+            "include_global_state": false
+        });
+
+        if let Some(idx) = indices {
+            body.as_object_mut().unwrap().insert("indices".to_string(), json!(idx));
+        }
+
+        self.client
+            .snapshot()
+            .create(SnapshotCreateParts::RepositorySnapshot(repository, snapshot))
+            .body(body)
+            .wait_for_completion(false)
+            .send()
+            .await?;
+
+        Ok(())
+    }
+
+    pub async fn delete_snapshot(
+        &self,
+        repository: &str,
+        snapshot: &str,
+    ) -> Result<(), Error> {
+        self.client
+            .snapshot()
+            .delete(SnapshotDeleteParts::RepositorySnapshot(repository, &[snapshot]))
+            .send()
+            .await?;
+
+        Ok(())
+    }
+
+    pub async fn restore_snapshot(
+        &self,
+        repository: &str,
+        snapshot: &str,
+        indices: Option<Vec<String>>,
+    ) -> Result<(), Error> {
+        let mut body = json!({
+            "ignore_unavailable": true,
+            "include_global_state": false
+        });
+
+        if let Some(idx) = indices {
+            body.as_object_mut().unwrap().insert("indices".to_string(), json!(idx));
+        }
+
+        self.client
+            .snapshot()
+            .restore(SnapshotRestoreParts::RepositorySnapshot(repository, snapshot))
+            .body(body)
+            .wait_for_completion(false)
+            .send()
+            .await?;
+
+        Ok(())
+    }
+
+    pub async fn get_cluster_health(&self) -> Result<ClusterHealth, Error> {
+        let response = self.client
+            .cluster()
+            .health(elasticsearch::cluster::ClusterHealthParts::None)
+            .send()
+            .await?;
+
+        let health = response.json::<Value>().await?;
+        
+        Ok(ClusterHealth {
+            cluster_name: health["cluster_name"].as_str().unwrap_or("").to_string(),
+            status: health["status"].as_str().unwrap_or("").to_string(),
+            number_of_nodes: health["number_of_nodes"].as_i64().unwrap_or(0) as i32,
+            number_of_data_nodes: health["number_of_data_nodes"].as_i64().unwrap_or(0) as i32,
+            active_primary_shards: health["active_primary_shards"].as_i64().unwrap_or(0) as i32,
+            active_shards: health["active_shards"].as_i64().unwrap_or(0) as i32,
+            relocating_shards: health["relocating_shards"].as_i64().unwrap_or(0) as i32,
+            initializing_shards: health["initializing_shards"].as_i64().unwrap_or(0) as i32,
+            unassigned_shards: health["unassigned_shards"].as_i64().unwrap_or(0) as i32,
+            delayed_unassigned_shards: health["delayed_unassigned_shards"].as_i64().unwrap_or(0) as i32,
+            number_of_pending_tasks: health["number_of_pending_tasks"].as_i64().unwrap_or(0) as i32,
+            number_of_in_flight_fetch: health["number_of_in_flight_fetch"].as_i64().unwrap_or(0) as i32,
+            task_max_waiting_in_queue_millis: health["task_max_waiting_in_queue_millis"].as_i64().unwrap_or(0),
+            active_shards_percent_as_number: health["active_shards_percent_as_number"].as_f64().unwrap_or(0.0),
+        })
+    }
+
+    pub async fn get_cluster_stats(&self) -> Result<Value, Error> {
+        let response = self.client
+            .cluster()
+            .stats(elasticsearch::cluster::ClusterStatsParts::None)
+            .send()
+            .await?;
+
+        response.json::<Value>().await.map_err(Error::from)
     }
 } 
