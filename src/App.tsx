@@ -4,7 +4,7 @@ import { Layout } from './components/Layout';
 import { ClusterOverview } from './components/ClusterOverview';
 import { IndexList } from './components/IndexList';
 import { ShardList } from './components/ShardList';
-import { Search } from './components/Search';
+import { Search } from './features/search/components/Search';
 import { Snapshots } from './components/Snapshots';
 import { ErrorBoundary } from './components/ErrorBoundary';
 

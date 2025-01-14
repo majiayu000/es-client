@@ -114,6 +114,7 @@ export function Search({ connectionId }: SearchProps) {
   const [newSearchName, setNewSearchName] = useState('');
   const [selectedGroup, setSelectedGroup] = useState<string>('all');
   const [columnOrder, setColumnOrder] = useState<string[]>([]);
+  const [isColumnOrderInitialized, setIsColumnOrderInitialized] = useState(false);
   const [draggedColumn, setDraggedColumn] = useState<string | null>(null);
   const [columnStates, setColumnStates] = useState<Record<string, ColumnState>>({});
   const [resizingColumn, setResizingColumn] = useState<string | null>(null);
@@ -594,67 +595,131 @@ export function Search({ connectionId }: SearchProps) {
 
   // 初始化列顺序
   useEffect(() => {
-    if (results.length > 0) {
-      const allColumns = ['_id', ...Object.keys(results[0]._source)];
-      // 保留已有的列顺序，只添加新的列
-      const existingColumns = new Set(columnOrder);
-      const newColumns = allColumns.filter(col => !existingColumns.has(col));
-      if (newColumns.length > 0) {
-        setColumnOrder(prev => [...prev, ...newColumns]);
-      } else if (columnOrder.length === 0) {
-        setColumnOrder(allColumns);
-      }
+    if (results.length > 0 && columnOrder.length === 0) {
+      const initialOrder = ['_id', ...Object.keys(results[0]._source)];
+      console.log('Initializing column order:', initialOrder);
+      setColumnOrder(initialOrder);
     }
   }, [results]);
 
+  // 修改拖拽处理函数
   const handleDragStart = (e: React.DragEvent<HTMLTableCellElement>, columnKey: string) => {
-    e.stopPropagation();
+    console.log('Drag start:', columnKey);
+    e.dataTransfer.setData('text/plain', columnKey);
     setDraggedColumn(columnKey);
     e.currentTarget.classList.add('opacity-50');
-    // 设置拖拽效果
-    e.dataTransfer.effectAllowed = 'move';
   };
 
   const handleDragEnd = (e: React.DragEvent<HTMLTableCellElement>) => {
-    e.stopPropagation();
     e.currentTarget.classList.remove('opacity-50');
     setDraggedColumn(null);
   };
 
-  const handleDragOver = (e: React.DragEvent<HTMLTableCellElement>, columnKey: string) => {
+  const handleDragOver = (e: React.DragEvent<HTMLTableCellElement>) => {
     e.preventDefault();
     e.stopPropagation();
-    if (draggedColumn === columnKey) return;
-    e.currentTarget.classList.add('bg-indigo-100');
-    e.dataTransfer.dropEffect = 'move';
+    e.currentTarget.classList.add('bg-indigo-100', 'dark:bg-indigo-900/50');
   };
 
   const handleDragLeave = (e: React.DragEvent<HTMLTableCellElement>) => {
-    e.stopPropagation();
-    e.currentTarget.classList.remove('bg-indigo-100');
+    e.currentTarget.classList.remove('bg-indigo-100', 'dark:bg-indigo-900/50');
   };
 
   const handleDrop = (e: React.DragEvent<HTMLTableCellElement>, targetColumnKey: string) => {
     e.preventDefault();
     e.stopPropagation();
-    e.currentTarget.classList.remove('bg-indigo-100');
+    e.currentTarget.classList.remove('bg-indigo-100', 'dark:bg-indigo-900/50');
     
-    if (!draggedColumn || draggedColumn === targetColumnKey) return;
+    const draggedKey = e.dataTransfer.getData('text/plain');
+    console.log('Drop event - dragged:', draggedKey, 'target:', targetColumnKey);
+
+    if (!draggedKey || draggedKey === targetColumnKey) return;
 
     const newOrder = [...columnOrder];
-    const draggedIndex = newOrder.indexOf(draggedColumn);
+    const draggedIndex = newOrder.indexOf(draggedKey);
     const targetIndex = newOrder.indexOf(targetColumnKey);
+
+    console.log('Current order:', newOrder);
+    console.log('Dragged index:', draggedIndex);
+    console.log('Target index:', targetIndex);
 
     if (draggedIndex === -1 || targetIndex === -1) return;
 
     // 移除拖动的列
     newOrder.splice(draggedIndex, 1);
     // 在目标位置插入
-    newOrder.splice(targetIndex, 0, draggedColumn);
+    newOrder.splice(targetIndex, 0, draggedKey);
 
+    console.log('New order:', newOrder);
     setColumnOrder(newOrder);
-    setDraggedColumn(null);
+
+    // 强制重新渲染
+    setTimeout(() => {
+      const table = tableRef.current;
+      if (table) {
+        table.style.opacity = '0.99';
+        setTimeout(() => {
+          table.style.opacity = '1';
+        }, 0);
+      }
+    }, 0);
   };
+
+  // 修改表格头部渲染
+  const renderTableHeader = () => (
+    <thead className="bg-gray-50 dark:bg-gray-800">
+      <tr>
+        {columnOrder.map(key => {
+          const column = columns.find(col => col.key === key);
+          return (
+            <th
+              key={key}
+              draggable="true"
+              onDragStart={(e) => handleDragStart(e, key)}
+              onDragEnd={handleDragEnd}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={(e) => handleDrop(e, key)}
+              className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-move hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200 select-none"
+            >
+              <div className="flex items-center space-x-1">
+                <span>{column?.title || key}</span>
+                <svg className="h-4 w-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M7 4a1 1 0 011-1h4a1 1 0 110 2H8a1 1 0 01-1-1zM5 8a1 1 0 011-1h8a1 1 0 110 2H6a1 1 0 01-1-1zM3 12a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" />
+                </svg>
+              </div>
+            </th>
+          );
+        })}
+      </tr>
+    </thead>
+  );
+
+  // 渲染表格内容
+  const renderTableBody = () => (
+    <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
+      {results.map((doc) => (
+        <tr 
+          key={doc._id} 
+          className="hover:bg-gray-50 dark:hover:bg-gray-800"
+          onClick={() => {
+            setSelectedRow(doc);
+            setShowRowDetail(true);
+          }}
+        >
+          {columnOrder.map(key => {
+            const value = key === '_id' ? doc._id : doc._source[key];
+            const column = columns.find(col => col.key === key);
+            return (
+              <td key={key} className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-300">
+                {column?.render ? column.render(value) : value}
+              </td>
+            );
+          })}
+        </tr>
+      ))}
+    </tbody>
+  );
 
   // 初始化列状态
   useEffect(() => {
@@ -1180,53 +1245,10 @@ export function Search({ connectionId }: SearchProps) {
 
               {results.length > 0 ? (
                 <div ref={tableRef} className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        {columnOrder.map(columnKey => {
-                          const column = columns.find(col => col.key === columnKey);
-                          return (
-                            <TableHead
-                              key={columnKey}
-                              className="whitespace-nowrap"
-                            >
-                              <div className="flex items-center space-x-2">
-                                <span>{column?.title || columnKey}</span>
-                                <button
-                                  onClick={() => handleSort(columnKey)}
-                                  className="p-1 hover:bg-gray-100 rounded"
-                                >
-                                  <ArrowUpDown className="h-4 w-4" />
-                                </button>
-                              </div>
-                            </TableHead>
-                          );
-                        })}
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {sortedResults.map((result) => (
-                        <TableRow
-                          key={result._id}
-                          className="hover:bg-gray-50 cursor-pointer"
-                          onClick={() => {
-                            setSelectedRow(result);
-                            setShowRowDetail(true);
-                          }}
-                        >
-                          {columnOrder.map(columnKey => {
-                            const value = columnKey === '_id' ? result._id : result._source[columnKey];
-                            const column = columns.find(col => col.key === columnKey);
-                            return (
-                              <TableCell key={columnKey} className="align-top">
-                                {column?.render ? column.render(value) : formatValue(value)}
-                              </TableCell>
-                            );
-                          })}
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                  <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                    {renderTableHeader()}
+                    {renderTableBody()}
+                  </table>
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
