@@ -1,7 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { v4 as uuidv4 } from 'uuid';
 import { useAppStore } from '../store';
+import { LoadingButton } from './ui/loading-button';
+import { LogViewer } from './ui/log-viewer';
+import { ErrorMessage } from './ui/error-message';
+import { Input } from './ui/input';
+import { Label } from './ui/label';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
+import { Separator } from './ui/separator';
+
+// 从环境变量获取默认连接地址，如果没有则使用 localhost:9200
+const DEFAULT_ES_HOST = import.meta.env.VITE_DEFAULT_ES_HOST || 'http://localhost:9200';
+// 判断是否是开发环境
+const isDev = import.meta.env.DEV;
 
 interface ConnectionFormProps {
   onConnected: (connectionId: string) => void;
@@ -10,13 +22,14 @@ interface ConnectionFormProps {
 
 export function ConnectionForm({ onConnected, onCancel }: ConnectionFormProps) {
   const [name, setName] = useState('开发环境');
-  const [hosts, setHosts] = useState('http://172.31.0.7:19200');
+  const [hosts, setHosts] = useState(DEFAULT_ES_HOST);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [timeout, setTimeout] = useState('60');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
+  const nameInputRef = useRef<HTMLInputElement>(null);
 
   const addConnection = useAppStore((state) => state.addConnection);
 
@@ -104,129 +117,149 @@ export function ConnectionForm({ onConnected, onCancel }: ConnectionFormProps) {
     }
   };
 
+  // 添加 ESC 键关闭功能
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && onCancel) {
+        onCancel();
+      }
+    };
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, [onCancel]);
+
+  // 自动聚焦到名称输入框
+  useEffect(() => {
+    nameInputRef.current?.focus();
+  }, []);
+
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-lg mx-4">
-        <div className="p-6">
-          <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">添加连接</h2>
+    <div 
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-in fade-in duration-200"
+      onClick={(e) => {
+        if (e.target === e.currentTarget && onCancel) {
+          onCancel();
+        }
+      }}
+    >
+      <Card className="w-full max-w-lg bg-white shadow-lg" onClick={e => e.stopPropagation()}>
+        <CardHeader className="space-y-1 pb-4">
+          <CardTitle className="text-2xl font-semibold">添加连接</CardTitle>
+          <CardDescription>
+            连接到 Elasticsearch 集群。所有信息都将安全地存储在本地。
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
-            <div>
-              <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                连接名称
-              </label>
-              <input
-                type="text"
-                id="name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white sm:text-sm"
-                placeholder="开发环境"
-              />
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="name" className="text-sm font-medium">
+                  连接名称 <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="name"
+                  ref={nameInputRef}
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="开发环境"
+                  className="focus:ring-2 focus:ring-offset-0"
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="hosts" className="text-sm font-medium">
+                  主机地址 <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="hosts"
+                  value={hosts}
+                  onChange={(e) => setHosts(e.target.value)}
+                  placeholder={isDev ? DEFAULT_ES_HOST : 'http://localhost:9200'}
+                  className="focus:ring-2 focus:ring-offset-0"
+                  required
+                  pattern="https?://.*"
+                  title="请输入有效的 URL 地址，以 http:// 或 https:// 开头"
+                />
+                <p className="text-sm text-muted-foreground">
+                  输入 Elasticsearch 集群的地址，例如: http://localhost:9200
+                </p>
+              </div>
             </div>
 
-            <div>
-              <label htmlFor="hosts" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                主机地址
-              </label>
-              <input
-                type="text"
-                id="hosts"
-                value={hosts}
-                onChange={(e) => setHosts(e.target.value)}
-                className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white sm:text-sm"
-                placeholder="http://localhost:9200"
-              />
-            </div>
+            <Separator className="my-6" />
 
-            <div>
-              <label htmlFor="username" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                用户名（可选）
-              </label>
-              <input
-                type="text"
-                id="username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white sm:text-sm"
-                placeholder="elastic"
-              />
-            </div>
+            <div className="space-y-4">
+              <h3 className="text-sm font-medium text-muted-foreground">认证信息（可选）</h3>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="username" className="text-sm font-medium">用户名</Label>
+                  <Input
+                    id="username"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    placeholder="elastic"
+                    className="focus:ring-2 focus:ring-offset-0"
+                  />
+                </div>
 
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                密码（可选）
-              </label>
-              <input
-                type="password"
-                id="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white sm:text-sm"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="timeout" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                超时时间（秒）
-              </label>
-              <input
-                type="number"
-                id="timeout"
-                value={timeout}
-                onChange={(e) => setTimeout(e.target.value)}
-                className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white sm:text-sm"
-                min="1"
-                max="300"
-              />
-            </div>
-
-            {error && (
-              <div className="rounded-md bg-red-50 dark:bg-red-900/50 p-4">
-                <div className="flex">
-                  <div className="flex-shrink-0">
-                    <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                    </svg>
-                  </div>
-                  <div className="ml-3">
-                    <h3 className="text-sm font-medium text-red-800 dark:text-red-200">{error}</h3>
-                  </div>
+                <div className="space-y-2">
+                  <Label htmlFor="password" className="text-sm font-medium">密码</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="focus:ring-2 focus:ring-offset-0"
+                  />
                 </div>
               </div>
-            )}
+            </div>
 
-            {logs.length > 0 && (
-              <div className="mt-4 bg-gray-50 dark:bg-gray-900 rounded-md p-4">
-                <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">连接日志</div>
-                <div className="space-y-1 text-sm text-gray-500 dark:text-gray-400 font-mono">
-                  {logs.map((log, index) => (
-                    <div key={index}>{log}</div>
-                  ))}
-                </div>
+            <Separator className="my-6" />
+
+            <div className="space-y-4">
+              <h3 className="text-sm font-medium text-muted-foreground">高级设置</h3>
+              <div className="space-y-2">
+                <Label htmlFor="timeout" className="text-sm font-medium">超时时间（秒）</Label>
+                <Input
+                  id="timeout"
+                  type="number"
+                  value={timeout}
+                  onChange={(e) => setTimeout(e.target.value)}
+                  min={1}
+                  max={300}
+                  className="w-32 focus:ring-2 focus:ring-offset-0"
+                />
+                <p className="text-sm text-muted-foreground">
+                  设置连接超时时间，默认为 60 秒
+                </p>
               </div>
-            )}
+            </div>
 
-            <div className="flex justify-end space-x-3">
-              <button
-                type="button"
+            <ErrorMessage error={error} className="mt-6" />
+            <LogViewer logs={logs} title="连接日志" className="mt-6" />
+
+            <div className="flex justify-end space-x-3 pt-6">
+              <LoadingButton
+                variant="outline"
                 onClick={onCancel}
-                className="inline-flex justify-center py-2 px-4 border border-gray-300 dark:border-gray-600 shadow-sm text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                type="button"
+                className="min-w-[80px]"
               >
                 取消
-              </button>
-              <button
+              </LoadingButton>
+              <LoadingButton
                 type="submit"
-                disabled={loading}
-                className={`inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 ${
-                  loading ? 'opacity-50 cursor-not-allowed' : ''
-                }`}
+                loading={loading}
+                className="min-w-[80px]"
               >
-                {loading ? '连接中...' : '连接'}
-              </button>
+                连接
+              </LoadingButton>
             </div>
           </form>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
     </div>
   );
 } 

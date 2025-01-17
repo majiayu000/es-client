@@ -51,7 +51,7 @@ export const useAppStore = create<AppState>()(
       })),
     }),
     {
-      name: 'es-lif-storage',
+      name: 'elastic-eye-storage',
       partialize: (state) => ({
         isDarkMode: state.isDarkMode,
         connections: state.connections,

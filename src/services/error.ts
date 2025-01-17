@@ -36,7 +36,7 @@ class ErrorService {
 
   private saveErrors() {
     try {
-      localStorage.setItem('es-lif-errors', JSON.stringify(this.errors));
+      localStorage.setItem('elastic-eye-errors', JSON.stringify(this.errors));
     } catch (e) {
       console.error('Failed to save errors to localStorage:', e);
     }
@@ -44,7 +44,7 @@ class ErrorService {
 
   loadErrors(): ErrorInfo[] {
     try {
-      const saved = localStorage.getItem('es-lif-errors');
+      const saved = localStorage.getItem('elastic-eye-errors');
       if (saved) {
         this.errors = JSON.parse(saved);
       }
@@ -57,7 +57,7 @@ class ErrorService {
   clearErrors() {
     this.errors = [];
     try {
-      localStorage.removeItem('es-lif-errors');
+      localStorage.removeItem('elastic-eye-errors');
     } catch (e) {
       console.error('Failed to clear errors from localStorage:', e);
     }

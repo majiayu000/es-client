@@ -1,7 +1,7 @@
 // Prevents additional console window on Windows in release
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use es_lif_lib::{AppState, commands, db::Database};
+use elastic_eye_lib::{AppState, commands, db::Database};
 use tauri::Manager;
 use std::sync::Arc;
 

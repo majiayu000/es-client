@@ -7,7 +7,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { SearchProps, SearchResult, SearchResponse, IndexInfo, Column, ColumnState, FieldMetadata, SearchCondition, SavedSearch } from '../types';
-import { MAX_CELL_HEIGHT, commonFieldMetadata, predefinedFieldMetadata } from '../constants';
+import { MAX_CELL_HEIGHT, commonFieldMetadata } from '../constants';
 import {  buildQuery, getOperatorOptions } from '../utils';
 
 

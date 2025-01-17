@@ -131,7 +131,7 @@ export function Layout({ children }: LayoutProps) {
                 <Link to="/" className="text-xl font-bold font-mono tracking-wider relative group">
                   <span className="relative z-10 bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-400 dark:to-purple-400">ES</span>
                   <span className="relative z-10 text-gray-700 dark:text-gray-200">-</span>
-                  <span className="relative z-10 bg-clip-text text-transparent bg-gradient-to-r from-purple-600 to-indigo-600 dark:from-purple-400 dark:to-indigo-400">LIF</span>
+                  <span className="relative z-10 bg-clip-text text-transparent bg-gradient-to-r from-purple-600 to-indigo-600 dark:from-purple-400 dark:to-indigo-400">EYE</span>
                   <div className="absolute -inset-x-2 -inset-y-1 bg-gradient-to-r from-indigo-500/10 to-purple-500/10 blur opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-lg"></div>
                   <div className="absolute -bottom-1 left-0 right-0 h-0.5 bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-500 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500 origin-left"></div>
                 </Link>
@@ -207,7 +207,7 @@ export function Layout({ children }: LayoutProps) {
         <div className="max-w-[90rem] mx-auto py-6 px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center">
             <div className="text-sm text-gray-500 dark:text-gray-400">
-              © {new Date().getFullYear()} ES-LIF. All rights reserved.
+              © {new Date().getFullYear()} ElasticEye. All rights reserved.
             </div>
             <div className="text-sm text-gray-500 dark:text-gray-400">
               Version 1.0.0
