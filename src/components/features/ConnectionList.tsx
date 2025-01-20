@@ -1,5 +1,5 @@
 import React from 'react';
-import { useAppStore } from '../store';
+import { useAppStore } from '@/store';
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -16,7 +16,7 @@ interface ConnectionListProps {
   onAddNew: () => void;
 }
 
-export function ConnectionList({ onConnectionSelect, onAddNew }: ConnectionListProps) {
+function ConnectionList({ onConnectionSelect, onAddNew }: ConnectionListProps) {
   const { connections, activeConnectionId, removeConnection } = useAppStore();
   const activeConnection = connections.find(conn => conn.id === activeConnectionId);
 
@@ -97,4 +97,6 @@ export function ConnectionList({ onConnectionSelect, onAddNew }: ConnectionListP
       )}
     </div>
   );
-} 
+}
+
+export default ConnectionList; 

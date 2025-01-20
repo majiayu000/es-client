@@ -21,7 +21,7 @@ interface Column {
   defaultVisible: boolean;
 }
 
-export function IndexList({ connectionId }: IndexListProps) {
+function IndexList({ connectionId }: IndexListProps) {
   const [indices, setIndices] = useState<IndexInfo[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -289,4 +289,6 @@ export function IndexList({ connectionId }: IndexListProps) {
       </div>
     </div>
   );
-} 
+}
+
+export default IndexList;

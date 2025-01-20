@@ -342,4 +342,6 @@ export function ClusterInfo({ connectionId }: ClusterInfoProps) {
       )}
     </div>
   );
-} 
+}
+
+export default ClusterInfo; 

@@ -1,38 +1,32 @@
-import * as React from "react"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import React, { useEffect, useRef } from 'react';
 
 interface LogViewerProps {
-  logs: string[]
-  title?: string
-  className?: string
-  maxHeight?: string | number
+  logs: string[];
+  maxHeight?: string;
 }
 
-export function LogViewer({ 
-  logs, 
-  title = "日志", 
-  className = "", 
-  maxHeight = "300px" 
-}: LogViewerProps) {
-  if (logs.length === 0) return null
+function LogViewer({ logs, maxHeight = '200px' }: LogViewerProps) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [logs]);
 
   return (
-    <Card className={className}>
-      <CardHeader>
-        <CardTitle className="text-sm font-medium">{title}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <ScrollArea className="h-full" style={{ maxHeight }}>
-          <div className="space-y-1 font-mono text-sm">
-            {logs.map((log, index) => (
-              <div key={index} className="whitespace-pre-wrap text-muted-foreground">
-                {log}
-              </div>
-            ))}
-          </div>
-        </ScrollArea>
-      </CardContent>
-    </Card>
-  )
-} 
+    <div
+      ref={scrollRef}
+      className="bg-gray-100 dark:bg-gray-800 rounded-md p-4 font-mono text-sm overflow-y-auto"
+      style={{ maxHeight }}
+    >
+      {logs.map((log, index) => (
+        <div key={index} className="text-gray-700 dark:text-gray-300">
+          {log}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export default LogViewer; 

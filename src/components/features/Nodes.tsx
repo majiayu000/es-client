@@ -1,40 +1,45 @@
 import React, { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { Pagination } from '@/components/common';
 
-interface IndicesProps {
+interface NodesProps {
   connectionId: string;
 }
 
-interface IndexInfo {
-  health: string;
-  status: string;
-  index: string;
-  uuid: string;
-  pri: number;
-  rep: number;
-  'docs.count': number;
-  'docs.deleted': number;
-  'store.size': string;
-  'pri.store.size': string;
+interface NodeInfo {
+  name: string;
+  ip: string;
+  nodeRole: string;
+  heapPercent: number;
+  ramPercent: number;
+  cpu: number;
+  load1m: number;
+  load5m: number;
+  load15m: number;
+  diskUsed: string;
+  diskTotal: string;
+  diskPercent: number;
 }
 
-export function Indices({ connectionId }: IndicesProps) {
-  const [indices, setIndices] = useState<IndexInfo[]>([]);
+const PAGE_SIZE = 10;
+
+export function Nodes({ connectionId }: NodesProps) {
+  const [nodes, setNodes] = useState<NodeInfo[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedIndices, setSelectedIndices] = useState<Set<string>>(new Set());
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
-    loadIndices();
+    loadNodes();
   }, [connectionId]);
 
-  const loadIndices = async () => {
+  const loadNodes = async () => {
     try {
       setLoading(true);
       setError(null);
-      const indexList = await invoke<IndexInfo[]>('list_indices', { connectionId });
-      setIndices(indexList);
+      const nodeList = await invoke<NodeInfo[]>('list_nodes', { connectionId });
+      setNodes(nodeList);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -42,33 +47,22 @@ export function Indices({ connectionId }: IndicesProps) {
     }
   };
 
-  const filteredIndices = indices.filter(index => 
-    index.index.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredNodes = nodes.filter(node => 
+    node.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    node.ip.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    node.nodeRole.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const toggleIndexSelection = (indexName: string) => {
-    setSelectedIndices(prev => {
-      const newSelection = new Set(prev);
-      if (newSelection.has(indexName)) {
-        newSelection.delete(indexName);
-      } else {
-        newSelection.add(indexName);
-      }
-      return newSelection;
-    });
-  };
+  const totalPages = Math.ceil(filteredNodes.length / PAGE_SIZE);
+  const paginatedNodes = filteredNodes.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE
+  );
 
-  const getHealthColor = (health: string) => {
-    switch (health.toLowerCase()) {
-      case 'green':
-        return 'bg-green-100 text-green-800';
-      case 'yellow':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'red':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
+  const getUsageColor = (percent: number) => {
+    if (percent >= 90) return 'text-red-600';
+    if (percent >= 75) return 'text-yellow-600';
+    return 'text-green-600';
   };
 
   return (
@@ -78,30 +72,19 @@ export function Indices({ connectionId }: IndicesProps) {
         <div className="px-6 py-5 border-b border-gray-100">
           <div className="flex justify-between items-center">
             <div>
-              <h2 className="text-lg font-semibold text-gray-900">索引管理</h2>
+              <h2 className="text-lg font-semibold text-gray-900">节点管理</h2>
               <p className="mt-1 text-sm text-gray-500">
-                管理和监控您的 Elasticsearch 索引
+                管理和监控您的 Elasticsearch 节点
               </p>
             </div>
             <div className="flex space-x-3">
               <button
-                onClick={loadIndices}
+                onClick={loadNodes}
                 disabled={loading}
                 className="px-4 py-2 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 ring-1 ring-gray-200 hover:ring-indigo-500 transition-all duration-200"
               >
                 刷新
               </button>
-              {selectedIndices.size > 0 && (
-                <button
-                  onClick={() => {
-                    // TODO: 实现批量操作
-                    console.log('Selected indices:', Array.from(selectedIndices));
-                  }}
-                  className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm transition-all duration-200"
-                >
-                  操作选中 ({selectedIndices.size})
-                </button>
-              )}
             </div>
           </div>
         </div>
@@ -113,8 +96,11 @@ export function Indices({ connectionId }: IndicesProps) {
               <input
                 type="text"
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="搜索索引..."
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  setCurrentPage(1); // 重置页码
+                }}
+                placeholder="搜索节点名称、IP或角色..."
                 className="w-full pl-4 pr-10 py-2 text-sm border-0 bg-white text-gray-900 rounded-lg ring-1 ring-gray-200 focus:ring-2 focus:ring-indigo-500 transition-all duration-200"
               />
             </div>
@@ -140,58 +126,41 @@ export function Indices({ connectionId }: IndicesProps) {
           </div>
         )}
 
-        {/* 索引列表 */}
+        {/* 节点列表 */}
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  <input
-                    type="checkbox"
-                    checked={selectedIndices.size === indices.length}
-                    onChange={() => {
-                      if (selectedIndices.size === indices.length) {
-                        setSelectedIndices(new Set());
-                      } else {
-                        setSelectedIndices(new Set(indices.map(i => i.index)));
-                      }
-                    }}
-                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                  />
+                  节点名称
                 </th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  健康状态
+                  IP地址
                 </th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  索引名称
+                  角色
                 </th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  状态
+                  堆内存
                 </th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  主分片
+                  系统内存
                 </th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  副本分片
+                  CPU使用率
                 </th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  文档数
+                  负载(1m/5m/15m)
                 </th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  已删除文档
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  存储大小
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  主分片存储
+                  磁盘使用
                 </th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {loading ? (
                 <tr>
-                  <td colSpan={10} className="px-6 py-4 text-center text-sm text-gray-500">
+                  <td colSpan={8} className="px-6 py-4 text-center text-sm text-gray-500">
                     <div className="flex justify-center items-center space-x-2">
                       <svg className="animate-spin h-5 w-5 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -201,54 +170,75 @@ export function Indices({ connectionId }: IndicesProps) {
                     </div>
                   </td>
                 </tr>
-              ) : filteredIndices.length === 0 ? (
+              ) : paginatedNodes.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="px-6 py-4 text-center text-sm text-gray-500">
-                    没有找到匹配的索引
+                  <td colSpan={8} className="px-6 py-4 text-center text-sm text-gray-500">
+                    没有找到匹配的节点
                   </td>
                 </tr>
               ) : (
-                filteredIndices.map((index) => (
+                paginatedNodes.map((node) => (
                   <tr 
-                    key={index.uuid}
+                    key={node.name}
                     className="hover:bg-gray-50 transition-colors duration-200"
                   >
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <input
-                        type="checkbox"
-                        checked={selectedIndices.has(index.index)}
-                        onChange={() => toggleIndexSelection(index.index)}
-                        className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                      />
+                      <div className="text-sm font-medium text-gray-900">{node.name}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {node.ip}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {node.nodeRole}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getHealthColor(index.health)}`}>
-                        {index.health}
-                      </span>
+                      <div className="flex items-center">
+                        <div className="w-16 bg-gray-200 rounded-full h-2.5 mr-2">
+                          <div 
+                            className={`h-2.5 rounded-full ${getUsageColor(node.heapPercent)}`}
+                            style={{ width: `${node.heapPercent}%` }}
+                          ></div>
+                        </div>
+                        <span className="text-sm text-gray-500">{node.heapPercent}%</span>
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">{index.index}</div>
+                      <div className="flex items-center">
+                        <div className="w-16 bg-gray-200 rounded-full h-2.5 mr-2">
+                          <div 
+                            className={`h-2.5 rounded-full ${getUsageColor(node.ramPercent)}`}
+                            style={{ width: `${node.ramPercent}%` }}
+                          ></div>
+                        </div>
+                        <span className="text-sm text-gray-500">{node.ramPercent}%</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div className="w-16 bg-gray-200 rounded-full h-2.5 mr-2">
+                          <div 
+                            className={`h-2.5 rounded-full ${getUsageColor(node.cpu)}`}
+                            style={{ width: `${node.cpu}%` }}
+                          ></div>
+                        </div>
+                        <span className="text-sm text-gray-500">{node.cpu}%</span>
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {index.status}
+                      {node.load1m.toFixed(2)} / {node.load5m.toFixed(2)} / {node.load15m.toFixed(2)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {index.pri}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {index.rep}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {index['docs.count'].toLocaleString()}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {index['docs.deleted'].toLocaleString()}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {index['store.size']}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {index['pri.store.size']}
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div className="w-16 bg-gray-200 rounded-full h-2.5 mr-2">
+                          <div 
+                            className={`h-2.5 rounded-full ${getUsageColor(node.diskPercent)}`}
+                            style={{ width: `${node.diskPercent}%` }}
+                          ></div>
+                        </div>
+                        <span className="text-sm text-gray-500">
+                          {node.diskUsed} / {node.diskTotal} ({node.diskPercent}%)
+                        </span>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -256,7 +246,18 @@ export function Indices({ connectionId }: IndicesProps) {
             </tbody>
           </table>
         </div>
+
+        {/* 分页 */}
+        {!loading && filteredNodes.length > 0 && (
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={setCurrentPage}
+          />
+        )}
       </div>
     </div>
   );
-} 
+}
+
+export default Nodes; 

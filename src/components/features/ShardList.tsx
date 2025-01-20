@@ -15,7 +15,7 @@ interface ShardListProps {
   connectionId: string;
 }
 
-export function ShardList({ connectionId }: ShardListProps) {
+function ShardList({ connectionId }: ShardListProps) {
   const [shards, setShards] = useState<ShardInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -176,4 +176,6 @@ export function ShardList({ connectionId }: ShardListProps) {
       </div>
     </div>
   );
-} 
+}
+
+export default ShardList;

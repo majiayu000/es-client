@@ -5,58 +5,52 @@ interface Connection {
   id: string;
   name: string;
   hosts: string[];
-  is_active: boolean;
+  username?: string;
+  password?: string;
+  is_active?: boolean;
 }
 
 interface AppState {
-  // 主题相关
   isDarkMode: boolean;
   toggleDarkMode: () => void;
-  
-  // 连接相关
   connections: Connection[];
   activeConnectionId: string | null;
   addConnection: (connection: Connection) => void;
-  removeConnection: (connectionId: string) => void;
-  setActiveConnection: (connectionId: string) => void;
-  updateConnection: (connectionId: string, updates: Partial<Connection>) => void;
+  updateConnection: (id: string, connection: Partial<Connection>) => void;
+  removeConnection: (id: string) => void;
+  setActiveConnection: (id: string | null) => void;
 }
 
 export const useAppStore = create<AppState>()(
   persist(
     (set) => ({
-      // 主题状态
-      isDarkMode: typeof window !== 'undefined' 
-        ? localStorage.getItem('darkMode') === 'true' ||
-          (!('darkMode' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)
-        : false,
+      isDarkMode: false,
       toggleDarkMode: () => set((state) => ({ isDarkMode: !state.isDarkMode })),
-
-      // 连接状态
       connections: [],
       activeConnectionId: null,
-      addConnection: (connection) => set((state) => ({
-        connections: [...state.connections, connection],
-        activeConnectionId: connection.id,
-      })),
-      removeConnection: (connectionId) => set((state) => ({
-        connections: state.connections.filter((conn) => conn.id !== connectionId),
-        activeConnectionId: state.activeConnectionId === connectionId ? null : state.activeConnectionId,
-      })),
-      setActiveConnection: (connectionId) => set({ activeConnectionId: connectionId }),
-      updateConnection: (connectionId, updates) => set((state) => ({
-        connections: state.connections.map((conn) =>
-          conn.id === connectionId ? { ...conn, ...updates } : conn
-        ),
-      })),
+      addConnection: (connection) =>
+        set((state) => ({
+          connections: [...state.connections, connection],
+          activeConnectionId: connection.id
+        })),
+      updateConnection: (id, connection) =>
+        set((state) => ({
+          connections: state.connections.map((conn) =>
+            conn.id === id ? { ...conn, ...connection } : conn
+          )
+        })),
+      removeConnection: (id) =>
+        set((state) => ({
+          connections: state.connections.filter((conn) => conn.id !== id),
+          activeConnectionId: state.activeConnectionId === id ? null : state.activeConnectionId
+        })),
+      setActiveConnection: (id) =>
+        set(() => ({
+          activeConnectionId: id
+        }))
     }),
     {
-      name: 'elastic-eye-storage',
-      partialize: (state) => ({
-        isDarkMode: state.isDarkMode,
-        connections: state.connections,
-        activeConnectionId: state.activeConnectionId,
-      }),
+      name: 'elastic-eye-storage'
     }
   )
 ); 

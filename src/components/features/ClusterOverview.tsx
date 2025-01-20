@@ -24,27 +24,50 @@ interface ClusterOverviewProps {
   connectionId?: string;
 }
 
-export function ClusterOverview({ connectionId }: ClusterOverviewProps) {
+function ClusterOverview({ connectionId }: ClusterOverviewProps) {
   const [clusterInfo, setClusterInfo] = useState<ClusterInfo | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (connectionId) {
+      console.log('Connection ID changed, fetching cluster info for:', connectionId);
       fetchClusterInfo();
+    } else {
+      console.log('No connection ID available');
     }
   }, [connectionId]);
 
   const fetchClusterInfo = async () => {
-    if (!connectionId) return;
+    if (!connectionId) {
+      console.log('No connection ID, skipping fetch');
+      return;
+    }
 
     try {
       setLoading(true);
       setError(null);
+      console.log('Fetching cluster info for connection:', connectionId);
       const info = await invoke<ClusterInfo>('get_cluster_info', { connectionId });
+      console.log('Received cluster info:', info);
       setClusterInfo(info);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      console.error('Failed to fetch cluster info:', err);
+      let errorMessage = '获取集群信息失败';
+      if (err instanceof Error) {
+        errorMessage = err.message;
+      } else if (typeof err === 'object' && err !== null) {
+        // 处理可能的 Tauri 错误对象
+        const tauriError = err as { message?: string, ConnectionError?: string };
+        if (tauriError.ConnectionError === 'Not connected to Elasticsearch') {
+          errorMessage = '未连接到 Elasticsearch，请检查：\n1. Elasticsearch 服务是否正在运行\n2. 连接地址是否正确\n3. 用户名密码是否正确';
+        } else {
+          errorMessage = tauriError.message || tauriError.ConnectionError || JSON.stringify(err);
+        }
+      } else {
+        errorMessage = String(err);
+      }
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -200,4 +223,6 @@ export function ClusterOverview({ connectionId }: ClusterOverviewProps) {
       </div>
     </div>
   );
-} 
+}
+
+export default ClusterOverview;

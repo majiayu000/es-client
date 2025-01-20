@@ -1,20 +1,41 @@
-import * as React from "react"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { XCircle } from "lucide-react"
-import { cn } from "@/lib/utils"
+import React from 'react';
+import { XCircleIcon } from '@heroicons/react/24/solid';
 
-interface ErrorMessageProps {
-  error: string | null
-  className?: string
+export interface ErrorMessageProps {
+  title?: string;
+  message: string;
+  onRetry?: () => void;
 }
 
-export function ErrorMessage({ error, className }: ErrorMessageProps) {
-  if (!error) return null
+function ErrorMessage({ title = '错误', message, onRetry }: ErrorMessageProps) {
+  if (!message) return null;
 
   return (
-    <Alert variant="destructive" className={cn("text-sm", className)}>
-      <XCircle className="h-4 w-4" />
-      <AlertDescription>{error}</AlertDescription>
-    </Alert>
-  )
-} 
+    <div className="rounded-md bg-red-50 p-4">
+      <div className="flex">
+        <div className="flex-shrink-0">
+          <XCircleIcon className="h-5 w-5 text-red-400" aria-hidden="true" />
+        </div>
+        <div className="ml-3">
+          <h3 className="text-sm font-medium text-red-800">{title}</h3>
+          <div className="mt-2 text-sm text-red-700">
+            <p>{message}</p>
+          </div>
+          {onRetry && (
+            <div className="mt-4">
+              <button
+                type="button"
+                onClick={onRetry}
+                className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+              >
+                重试
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default ErrorMessage; 

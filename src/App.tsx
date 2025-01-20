@@ -1,19 +1,7 @@
 import React from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
-import { Layout } from './components/Layout';
-import { ClusterOverview } from './components/ClusterOverview';
-import { IndexList } from './components/IndexList';
-import { ShardList } from './components/ShardList';
-import { Search } from './features/search/components/Search';
-import { Snapshots } from './components/Snapshots';
-import { ErrorBoundary } from './components/ErrorBoundary';
-
-// 包装路由组件，添加错误边界
-const withErrorBoundary = (Component: React.ComponentType<any>) => (props: any) => (
-  <ErrorBoundary>
-    <Component {...props} />
-  </ErrorBoundary>
-);
+import { Layout } from './components/layouts';
+import { ErrorBoundary } from './components/common';
+import { AppRoutes } from './routes';
 
 function App() {
   return (
@@ -31,31 +19,7 @@ function App() {
             );
           }
 
-          return (
-            <Routes>
-              <Route
-                path="/"
-                element={withErrorBoundary(ClusterOverview)({ connectionId: activeConnectionId })}
-              />
-              <Route
-                path="/indices"
-                element={withErrorBoundary(IndexList)({ connectionId: activeConnectionId })}
-              />
-              <Route
-                path="/shards"
-                element={withErrorBoundary(ShardList)({ connectionId: activeConnectionId })}
-              />
-              <Route
-                path="/search"
-                element={withErrorBoundary(Search)({ connectionId: activeConnectionId })}
-              />
-              <Route
-                path="/snapshots"
-                element={withErrorBoundary(Snapshots)({ connectionId: activeConnectionId })}
-              />
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
-          );
+          return <AppRoutes connectionId={activeConnectionId} />;
         }}
       </Layout>
     </ErrorBoundary>

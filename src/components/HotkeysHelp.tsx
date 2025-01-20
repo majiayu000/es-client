@@ -39,10 +39,10 @@ export function HotkeysHelp({ isOpen, onClose }: HotkeysHelpProps) {
   if (!isOpen) return null;
 
   // 按快捷键分组
-  const groupedHotkeys = Object.entries(hotkeys).reduce((acc, [id, value]) => {
-    const group = value.group || '其他';
+  const groupedHotkeys = hotkeys.reduce((acc, hotkey) => {
+    const group = hotkey.group || '其他';
     if (!acc[group]) acc[group] = [];
-    acc[group].push({ id, ...value });
+    acc[group].push(hotkey);
     return acc;
   }, {} as Record<string, GroupedHotkey[]>);
 

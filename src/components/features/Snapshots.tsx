@@ -25,7 +25,7 @@ interface Snapshot {
   };
 }
 
-export function Snapshots({ connectionId }: SnapshotsProps) {
+function Snapshots({ connectionId }: SnapshotsProps) {
   const [repositories, setRepositories] = useState<SnapshotRepository[]>([]);
   const [selectedRepository, setSelectedRepository] = useState<string>('');
   const [snapshots, setSnapshots] = useState<Snapshot[]>([]);
@@ -608,4 +608,6 @@ export function Snapshots({ connectionId }: SnapshotsProps) {
       )}
     </div>
   );
-} 
+}
+
+export default Snapshots;

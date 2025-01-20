@@ -16,7 +16,7 @@ interface ShardInfo {
   node: string;
 }
 
-export function Shards({ connectionId }: ShardsProps) {
+function Shards({ connectionId }: ShardsProps) {
   const [shards, setShards] = useState<ShardInfo[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -255,4 +255,6 @@ export function Shards({ connectionId }: ShardsProps) {
       </div>
     </div>
   );
-} 
+}
+
+export default Shards; 

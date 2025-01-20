@@ -10,11 +10,7 @@ import { SearchProps, SearchResult, SearchResponse, IndexInfo, Column, ColumnSta
 import { MAX_CELL_HEIGHT, commonFieldMetadata } from '../constants';
 import {  buildQuery, getOperatorOptions } from '../utils';
 
-
-
-
-
-export function Search({ connectionId }: SearchProps) {
+const Search: React.FC<SearchProps> = ({ connectionId }) => {
   const [index, setIndex] = useState('');
   const [indices, setIndices] = useState<IndexInfo[]>([]);
   const [filteredIndices, setFilteredIndices] = useState<IndexInfo[]>([]);
@@ -53,9 +49,6 @@ export function Search({ connectionId }: SearchProps) {
   const [hoveredRow, setHoveredRow] = useState<string | null>(null);
   const tableRef = useRef<HTMLDivElement>(null);
   const [dragOverKey, setDragOverKey] = useState<string | null>(null);
-
-
-
 
   // 字段分组
   const fieldGroups = useMemo(() => {
@@ -235,7 +228,6 @@ export function Search({ connectionId }: SearchProps) {
     }
   };
 
-
   const renderFieldInput = (condition: SearchCondition, index: number) => {
     const field = availableFields.find(f => f.name === condition.field);
     if (!field) {
@@ -293,7 +285,6 @@ export function Search({ connectionId }: SearchProps) {
         );
     }
   };
-
 
   const handleSearch = async () => {
     if (!index.trim()) {
@@ -368,7 +359,6 @@ export function Search({ connectionId }: SearchProps) {
       });
     }
   }, [results]);
-
 
   // 自动生成表格列
   const columns = useMemo(() => {
@@ -1251,4 +1241,6 @@ export function Search({ connectionId }: SearchProps) {
       </div>
     </div>
   );
-}
+};
+
+export default Search;

@@ -6,7 +6,7 @@ interface MobileNavProps {
   navigation: Array<{ name: string; href: string }>;
 }
 
-export function MobileNav({ navigation }: MobileNavProps) {
+function MobileNav({ navigation }: MobileNavProps) {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
@@ -72,4 +72,6 @@ export function MobileNav({ navigation }: MobileNavProps) {
       </div>
     </div>
   );
-} 
+}
+
+export default MobileNav; 

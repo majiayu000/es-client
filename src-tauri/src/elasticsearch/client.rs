@@ -237,54 +237,97 @@ impl ESClient {
     }
 
     pub async fn get_cluster_info(&self) -> AppResult<ClusterInfo> {
+        println!("Starting to fetch cluster info");
         // Get cluster health
-        let health = self.client
+        println!("Fetching cluster health...");
+        let health = match self.client
             .cluster()
             .health(ClusterHealthParts::None)
             .send()
-            .await
-            .map_err(|e| AppError::ElasticsearchError(e.to_string()))?;
+            .await {
+                Ok(response) => {
+                    println!("Successfully received health response");
+                    response
+                },
+                Err(e) => {
+                    println!("Failed to get cluster health: {:?}", e);
+                    return Err(AppError::ElasticsearchError(e.to_string()));
+                }
+            };
 
-        let health_response = health.json::<serde_json::Value>()
-            .await
-            .map_err(|e| AppError::ElasticsearchError(e.to_string()))?;
+        let health_response = match health.json::<serde_json::Value>().await {
+            Ok(json) => {
+                println!("Successfully parsed health response: {:?}", json);
+                json
+            },
+            Err(e) => {
+                println!("Failed to parse health response: {:?}", e);
+                return Err(AppError::ElasticsearchError(e.to_string()));
+            }
+        };
 
         // Get nodes info
-        let nodes = self.client
+        println!("Fetching nodes info...");
+        let nodes = match self.client
             .nodes()
             .info(NodesInfoParts::None)
             .send()
-            .await
-            .map_err(|e| AppError::ElasticsearchError(e.to_string()))?;
+            .await {
+                Ok(response) => {
+                    println!("Successfully received nodes response");
+                    response
+                },
+                Err(e) => {
+                    println!("Failed to get nodes info: {:?}", e);
+                    return Err(AppError::ElasticsearchError(e.to_string()));
+                }
+            };
 
-        let nodes_response = nodes.json::<serde_json::Value>()
-            .await
-            .map_err(|e| AppError::ElasticsearchError(e.to_string()))?;
+        let nodes_response = match nodes.json::<serde_json::Value>().await {
+            Ok(json) => {
+                println!("Successfully parsed nodes response: {:?}", json);
+                json
+            },
+            Err(e) => {
+                println!("Failed to parse nodes response: {:?}", e);
+                return Err(AppError::ElasticsearchError(e.to_string()));
+            }
+        };
 
+        // Extract node information
+        println!("Extracting node information...");
         let mut node_infos = Vec::new();
-        if let Some(nodes_obj) = nodes_response["nodes"].as_object() {
-            for (_id, node) in nodes_obj {
-                node_infos.push(NodeInfo {
+        if let Some(nodes) = nodes_response["nodes"].as_object() {
+            for (_id, node) in nodes {
+                let node_info = NodeInfo {
                     name: node["name"].as_str().unwrap_or("unknown").to_string(),
                     version: node["version"].as_str().unwrap_or("unknown").to_string(),
                     roles: node["roles"]
                         .as_array()
-                        .map(|r| r.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+                        .map(|roles| {
+                            roles
+                                .iter()
+                                .filter_map(|role| role.as_str().map(String::from))
+                                .collect()
+                        })
                         .unwrap_or_default(),
                     os: format!(
-                        "{} {} ({})",
+                        "{} {}",
                         node["os"]["name"].as_str().unwrap_or("unknown"),
-                        node["os"]["version"].as_str().unwrap_or(""),
-                        node["os"]["arch"].as_str().unwrap_or("")
+                        node["os"]["version"].as_str().unwrap_or("")
                     ),
                     jvm: format!(
                         "{} ({})",
-                        node["jvm"]["version"].as_str().unwrap_or("unknown"),
-                        node["jvm"]["vm_name"].as_str().unwrap_or("")
+                        node["jvm"]["vm_name"].as_str().unwrap_or("unknown"),
+                        node["jvm"]["version"].as_str().unwrap_or("unknown")
                     ),
-                });
+                };
+                node_infos.push(node_info);
             }
         }
+
+        println!("Successfully extracted node information");
+        println!("Creating final cluster info response");
 
         Ok(ClusterInfo {
             name: nodes_response["cluster_name"].as_str().unwrap_or("unknown").to_string(),

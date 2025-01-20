@@ -1,19 +1,18 @@
 import React, { useEffect, useCallback, useMemo } from 'react';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useHotkeys } from 'react-hotkeys-hook';
-import { ConnectionList } from './ConnectionList';
-import { ConnectionForm } from './ConnectionForm';
-import { MobileNav } from './MobileNav';
+import { ConnectionList, ConnectionForm } from '../features';
+import MobileNav from './MobileNav';
 import { SunIcon, MoonIcon, QuestionMarkCircleIcon } from '@heroicons/react/24/outline';
-import { useAppStore } from '../store';
-import { useHotkeysStore } from '../store/hotkeys';
-import { HotkeysHelp } from './HotkeysHelp';
+import { useAppStore } from '@/store';
+import { useHotkeysStore } from '@/store/hotkeys';
+import { HotkeysHelp } from '../common';
 
 interface LayoutProps {
   children: (props: { activeConnectionId: string | null }) => React.ReactNode;
 }
 
-export function Layout({ children }: LayoutProps) {
+function Layout({ children }: LayoutProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const [showConnectionForm, setShowConnectionForm] = React.useState(false);
@@ -231,4 +230,6 @@ export function Layout({ children }: LayoutProps) {
       />
     </div>
   );
-} 
+}
+
+export default Layout; 

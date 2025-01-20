@@ -104,10 +104,29 @@ pub async fn list_indices(connection_id: String, state: State<'_, AppState>) -> 
 
 #[tauri::command(async)]
 pub async fn get_cluster_info(connection_id: String, state: State<'_, AppState>) -> AppResult<ClusterInfo> {
+    println!("Attempting to get cluster info for connection_id: {}", connection_id);
     let es_clients = state.es_clients.lock().await;
+    println!("ES clients lock acquired");
+    
     match es_clients.get(&connection_id) {
-        Some(client) => client.get_cluster_info().await,
-        None => Err(AppError::ConnectionError("Not connected to Elasticsearch".to_string())),
+        Some(client) => {
+            println!("Found client for connection_id: {}", connection_id);
+            println!("Attempting to get cluster info...");
+            match client.get_cluster_info().await {
+                Ok(info) => {
+                    println!("Successfully retrieved cluster info: {:?}", info);
+                    Ok(info)
+                },
+                Err(e) => {
+                    println!("Failed to get cluster info: {:?}", e);
+                    Err(e)
+                }
+            }
+        },
+        None => {
+            println!("No client found for connection_id: {}", connection_id);
+            Err(AppError::ConnectionError("Not connected to Elasticsearch".to_string()))
+        }
     }
 }
 
