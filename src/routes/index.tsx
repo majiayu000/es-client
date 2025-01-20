@@ -1,10 +1,12 @@
 import React, { Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { ErrorBoundary } from '../components/common';
+import { NotFound } from '../components/common/NotFound';
 
 // 懒加载组件
 const ClusterOverview = React.lazy(() => import('../components/features/ClusterOverview'));
 const IndexList = React.lazy(() => import('../components/features/IndexList'));
+const IndexDetails = React.lazy(() => import('../components/features/IndexDetails'));
 const ShardList = React.lazy(() => import('../components/features/ShardList'));
 const Search = React.lazy(() => 
   import('../features/search/components/Search').then(module => {
@@ -41,6 +43,10 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({ connectionId }) => {
         element={withErrorBoundary(IndexList)({ connectionId })}
       />
       <Route
+        path="/indices/:indexName"
+        element={withErrorBoundary(IndexDetails)({ connectionId })}
+      />
+      <Route
         path="/shards"
         element={withErrorBoundary(ShardList)({ connectionId })}
       />
@@ -52,7 +58,7 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({ connectionId }) => {
         path="/snapshots"
         element={withErrorBoundary(Snapshots)({ connectionId })}
       />
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="*" element={<NotFound />} />
     </Routes>
   );
 }; 

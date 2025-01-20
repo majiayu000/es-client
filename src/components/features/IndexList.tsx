@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { useNavigate } from 'react-router-dom';
 
 interface IndexListProps {
   connectionId: string;
@@ -13,6 +14,21 @@ interface IndexInfo {
   health: string;
   uuid: string;
   creation_date: string;
+}
+
+interface IndexDetails {
+  name: string;
+  health: string;
+  status: string;
+  uuid: string;
+  primary_shards: number;
+  replica_shards: number;
+  docs_count: number;
+  docs_deleted: number;
+  size_in_bytes: number;
+  creation_date: number;
+  settings: Record<string, any>;
+  mappings: Record<string, any>;
 }
 
 interface Column {
@@ -30,6 +46,10 @@ function IndexList({ connectionId }: IndexListProps) {
   const [visibleColumns, setVisibleColumns] = useState<Set<string>>(new Set([
     'checkbox', 'health', 'name', 'docs_count', 'size_in_bytes', 'creation_date', 'uuid', 'actions'
   ]));
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [selectedIndexDetails, setSelectedIndexDetails] = useState<IndexDetails | null>(null);
+  const [loadingDetails, setLoadingDetails] = useState(false);
+  const navigate = useNavigate();
 
   const columns: Column[] = [
     { key: 'checkbox', title: '', defaultVisible: true },
@@ -74,8 +94,8 @@ function IndexList({ connectionId }: IndexListProps) {
     return `${size.toFixed(2)} ${units[unitIndex]}`;
   };
 
-  const formatDate = (timestamp: string) => {
-    return new Date(parseInt(timestamp)).toLocaleString();
+  const formatDate = (timestamp: string | number) => {
+    return new Date(typeof timestamp === 'string' ? parseInt(timestamp) : timestamp).toLocaleString();
   };
 
   const getHealthColor = (health: string) => {
@@ -88,6 +108,24 @@ function IndexList({ connectionId }: IndexListProps) {
         return 'bg-red-100 text-red-800';
       default:
         return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const handleShowDetails = async (indexName: string) => {
+    try {
+      setLoadingDetails(true);
+      const details = await invoke<IndexDetails>('get_index_details', {
+        connectionId,
+        indexName,
+      });
+      setSelectedIndexDetails(details);
+      setShowDetailsModal(true);
+    } catch (err) {
+      console.error('Failed to fetch index details:', err);
+      // 显示错误提示
+      setError(err instanceof Error ? err.message : '获取索引详情失败');
+    } finally {
+      setLoadingDetails(false);
     }
   };
 
@@ -273,7 +311,7 @@ function IndexList({ connectionId }: IndexListProps) {
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                           <button
                             className="text-indigo-600 hover:text-indigo-900"
-                            onClick={() => {/* TODO: 添加查看详情功能 */}}
+                            onClick={() => handleShowDetails(index.name)}
                           >
                             详情
                           </button>
@@ -287,6 +325,77 @@ function IndexList({ connectionId }: IndexListProps) {
           </div>
         </div>
       </div>
+      {/* Modal */}
+      {showDetailsModal && selectedIndexDetails && (
+        <div className="fixed inset-0 z-10 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+          <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true" onClick={() => setShowDetailsModal(false)}></div>
+            <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+            <div className="inline-block align-bottom bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-3xl sm:w-full sm:p-6">
+              <div className="flex justify-between items-start">
+                <div>
+                  <h3 className="text-lg leading-6 font-medium text-gray-900">索引详情</h3>
+                  <p className="mt-1 text-sm text-gray-500">{selectedIndexDetails.name}</p>
+                </div>
+                <button
+                  type="button"
+                  className="bg-white rounded-md text-gray-400 hover:text-gray-500 focus:outline-none"
+                  onClick={() => setShowDetailsModal(false)}
+                >
+                  <span className="sr-only">关闭</span>
+                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <div className="mt-4">
+                <dl className="divide-y divide-gray-200">
+                  <div className="py-4 sm:grid sm:grid-cols-3 sm:gap-4">
+                    <dt className="text-sm font-medium text-gray-500">健康状态</dt>
+                    <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getHealthColor(selectedIndexDetails.health)}`}>
+                        {selectedIndexDetails.health}
+                      </span>
+                    </dd>
+                  </div>
+                  <div className="py-4 sm:grid sm:grid-cols-3 sm:gap-4">
+                    <dt className="text-sm font-medium text-gray-500">状态</dt>
+                    <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{selectedIndexDetails.status}</dd>
+                  </div>
+                  <div className="py-4 sm:grid sm:grid-cols-3 sm:gap-4">
+                    <dt className="text-sm font-medium text-gray-500">主分片数</dt>
+                    <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{selectedIndexDetails.primary_shards}</dd>
+                  </div>
+                  <div className="py-4 sm:grid sm:grid-cols-3 sm:gap-4">
+                    <dt className="text-sm font-medium text-gray-500">副本分片数</dt>
+                    <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{selectedIndexDetails.replica_shards}</dd>
+                  </div>
+                  <div className="py-4 sm:grid sm:grid-cols-3 sm:gap-4">
+                    <dt className="text-sm font-medium text-gray-500">文档数</dt>
+                    <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{selectedIndexDetails.docs_count.toLocaleString()}</dd>
+                  </div>
+                  <div className="py-4 sm:grid sm:grid-cols-3 sm:gap-4">
+                    <dt className="text-sm font-medium text-gray-500">已删除文档数</dt>
+                    <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{selectedIndexDetails.docs_deleted.toLocaleString()}</dd>
+                  </div>
+                  <div className="py-4 sm:grid sm:grid-cols-3 sm:gap-4">
+                    <dt className="text-sm font-medium text-gray-500">大小</dt>
+                    <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{formatSize(selectedIndexDetails.size_in_bytes)}</dd>
+                  </div>
+                  <div className="py-4 sm:grid sm:grid-cols-3 sm:gap-4">
+                    <dt className="text-sm font-medium text-gray-500">创建时间</dt>
+                    <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{formatDate(selectedIndexDetails.creation_date)}</dd>
+                  </div>
+                  <div className="py-4 sm:grid sm:grid-cols-3 sm:gap-4">
+                    <dt className="text-sm font-medium text-gray-500">UUID</dt>
+                    <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{selectedIndexDetails.uuid}</dd>
+                  </div>
+                </dl>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

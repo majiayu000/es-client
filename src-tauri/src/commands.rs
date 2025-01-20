@@ -9,7 +9,7 @@ use crate::{
     AppState,
 };
 use serde_json::{Value, json};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 #[allow(unused_imports)]
 use serde as _;
 use tauri::State;

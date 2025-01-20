@@ -4,6 +4,7 @@ use elasticsearch::{
     cat::CatIndicesParts,
     cluster::{ClusterHealthParts, ClusterStatsParts},
     nodes::NodesInfoParts,
+    indices::IndicesGetParts,
     snapshot::{
         SnapshotGetRepositoryParts, SnapshotGetParts,
         SnapshotCreateRepositoryParts, SnapshotCreateParts,
@@ -11,6 +12,7 @@ use elasticsearch::{
     },
     params::Bytes,
     Error,
+    IndexParts,
 };
 use serde_json::{Value, json};
 use crate::{
@@ -113,6 +115,22 @@ pub struct ClusterHealth {
     pub number_of_in_flight_fetch: i32,
     pub task_max_waiting_in_queue_millis: i64,
     pub active_shards_percent_as_number: f64,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct IndexDetails {
+    pub name: String,
+    pub health: String,
+    pub status: String,
+    pub uuid: String,
+    pub primary_shards: i64,
+    pub replica_shards: i64,
+    pub docs_count: i64,
+    pub docs_deleted: i64,
+    pub size_in_bytes: i64,
+    pub creation_date: i64,
+    pub settings: Value,
+    pub mappings: Value,
 }
 
 #[derive(Clone)]
@@ -571,5 +589,69 @@ impl ESClient {
             .await?;
 
         response.json::<Value>().await.map_err(Error::from)
+    }
+
+    pub async fn get_index_details(&self, index_name: &str) -> Result<IndexDetails, Error> {
+        // 获取索引健康状态
+        let health = self.client
+            .cat()
+            .indices(CatIndicesParts::Index(&[index_name]))
+            .format("json")
+            .send()
+            .await?
+            .json::<Vec<Value>>()
+            .await?
+            .first()
+            .cloned()
+            .ok_or_else(|| Error::from(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                format!("Index {} not found", index_name)
+            )))?;
+
+        // 获取索引设置和映射
+        let index_info = self.client
+            .indices()
+            .get(IndicesGetParts::Index(&[index_name]))
+            .send()
+            .await?
+            .json::<Value>()
+            .await?;
+
+        let index_settings = index_info[index_name]["settings"].clone();
+        let index_mappings = index_info[index_name]["mappings"].clone();
+
+        // 解析健康状态信息
+        let health_str = health["health"].as_str().unwrap_or("unknown").to_string();
+        let status = health["status"].as_str().unwrap_or("unknown").to_string();
+        let uuid = health["uuid"].as_str().unwrap_or("unknown").to_string();
+        let docs_count = health["docs.count"].as_str().unwrap_or("0").parse::<i64>().unwrap_or(0);
+        let docs_deleted = health["docs.deleted"].as_str().unwrap_or("0").parse::<i64>().unwrap_or(0);
+        let size_in_bytes = health["store.size"].as_str()
+            .unwrap_or("0")
+            .replace("b", "")
+            .parse::<i64>()
+            .unwrap_or(0);
+        let creation_date = index_settings["index"]["creation_date"]
+            .as_str()
+            .unwrap_or("0")
+            .parse::<i64>()
+            .unwrap_or(0);
+        let primary_shards = health["pri"].as_str().unwrap_or("0").parse::<i64>().unwrap_or(0);
+        let replica_shards = health["rep"].as_str().unwrap_or("0").parse::<i64>().unwrap_or(0);
+
+        Ok(IndexDetails {
+            name: index_name.to_string(),
+            health: health_str,
+            status,
+            uuid,
+            primary_shards,
+            replica_shards,
+            docs_count,
+            docs_deleted,
+            size_in_bytes,
+            creation_date,
+            settings: index_settings,
+            mappings: index_mappings,
+        })
     }
 } 

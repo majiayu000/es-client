@@ -2,6 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use elastic_eye_lib::{AppState, commands, db::Database};
+use elastic_eye_lib::elasticsearch::client::IndexDetails;
 use tauri::Manager;
 use std::sync::Arc;
 
@@ -55,6 +56,7 @@ async fn main() {
             commands::restore_snapshot,
             commands::get_cluster_health,
             commands::get_cluster_stats,
+            get_index_details,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");
@@ -65,4 +67,11 @@ async fn main() {
         }
         _ => {}
     });
+}
+
+#[tauri::command]
+async fn get_index_details(connection_id: String, index_name: String, state: tauri::State<'_, AppState>) -> Result<IndexDetails, String> {
+    let es_clients = state.es_clients.lock().await;
+    let client = es_clients.get(&connection_id).ok_or("Connection not found")?;
+    client.get_index_details(&index_name).await.map_err(|e| e.to_string())
 }

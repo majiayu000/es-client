@@ -29,11 +29,11 @@ function Layout({ children }: LayoutProps) {
 
   // 使用 useMemo 缓存导航配置
   const navigation = useMemo(() => [
-    { name: '首页', href: '/' },
-    { name: '分片', href: '/shards' },
-    { name: '索引', href: '/indices' },
-    { name: '搜索', href: '/search' },
-    { name: '快照', href: '/snapshots' },
+    { name: '首页', href: '/dashboard' },
+    { name: '分片', href: '/dashboard/shards' },
+    { name: '索引', href: '/dashboard/indices' },
+    { name: '搜索', href: '/dashboard/search' },
+    { name: '快照', href: '/dashboard/snapshots' },
   ], []);
 
   // 使用 useCallback 缓存事件处理函数
@@ -95,14 +95,14 @@ function Layout({ children }: LayoutProps) {
       unregisterHotkey('new-connection');
       unregisterHotkey('show-help');
     };
-  }, [navigation, registerHotkey, unregisterHotkey]); // 只在需要的依赖变化时重新注册
+  }, [navigation, registerHotkey, unregisterHotkey]);
 
   // 绑定快捷键行为
-  useHotkeys('cmd+1', () => navigate('/'), [navigate]);
-  useHotkeys('cmd+2', () => navigate('/shards'), [navigate]);
-  useHotkeys('cmd+3', () => navigate('/indices'), [navigate]);
-  useHotkeys('cmd+4', () => navigate('/search'), [navigate]);
-  useHotkeys('cmd+5', () => navigate('/snapshots'), [navigate]);
+  useHotkeys('cmd+1', () => navigate('/dashboard'), [navigate]);
+  useHotkeys('cmd+2', () => navigate('/dashboard/shards'), [navigate]);
+  useHotkeys('cmd+3', () => navigate('/dashboard/indices'), [navigate]);
+  useHotkeys('cmd+4', () => navigate('/dashboard/search'), [navigate]);
+  useHotkeys('cmd+5', () => navigate('/dashboard/snapshots'), [navigate]);
   useHotkeys('cmd+shift+d', toggleDarkMode, [toggleDarkMode]);
   useHotkeys('cmd+shift+n', () => setShowConnectionForm(true), []);
   useHotkeys('?', () => setShowHotkeysHelp(true), []);
@@ -232,4 +232,4 @@ function Layout({ children }: LayoutProps) {
   );
 }
 
-export default Layout; 
+export default Layout;
